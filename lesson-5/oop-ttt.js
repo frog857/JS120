@@ -155,9 +155,9 @@ class TTTGame {
       const symbols = {top: "_", bottom: "^", left: "|", right: "|"};
 
       Object.entries(bordersOfWinningSquare).forEach(([position, coords]) => {
-        let row = ascii[`row${coords.row}`].split("");
-        row[coords.col] = symbols[position];
-        ascii[`row${coords.row}`] = row.join("");
+        let row = ascii[`row${coords.row}`].split(""); // get row as a mutable array
+        row[coords.col] = symbols[position]; // set the appropriate symbol at the correct position
+        ascii[`row${coords.row}`] = row.join(""); // join the array back into a string and save it to the ascii object
       });
     });
 
@@ -171,6 +171,7 @@ class TTTGame {
    * guidelines. As the main orchestration engine of the game, it provides a
    * clear, sequential view of the game's flow: initialization, turn-taking
    * loop, and game end.
+   *
    * While it could be broken into smaller methods, doing so would scatter
    * this flow across multiple methods, making the game's structure harder
    * to understand at a glance. Each line is at an appropriate level of

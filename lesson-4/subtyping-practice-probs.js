@@ -6,7 +6,7 @@ class Greeting {
 
 class Hello extends Greeting {
   hi() {
-    this.greet("Hello!");
+    this.greet("Hello");
   }
 }
 
