@@ -107,16 +107,19 @@ class Participant {
   getScore() {
     let score = 0;
     let faceCards = ["K", "Q", "J"];
-    for (let card of this.hand) { // context loss problem?
+    for (let card of this.hand) { 
       if (faceCards.includes(card.rank)) {
         score += 10;
-      } else if (card.rank = "A") {
+      } else if (card.rank === "A") {
         score += 11;
       } else {
         score += parseInt(card.rank, 10);
       }
     }
-    // still need to handle Ace scoring
+    this.hand.filter(card => card.rank === "A").forEach(_ace => {
+      if (score > BJGame.BLACKJACK) score -= 10;
+    })
+
     return score;
   }
 }
@@ -131,6 +134,7 @@ class Player extends Participant {
     this.playerNumber = playerNumber;
     this.money = Player.DEFAULT_MONEY_AMOUNT;
     this.wager = undefined;
+    this.hasStayed = false;
   }
 
   getCard(game) {
@@ -143,33 +147,31 @@ class Player extends Participant {
     console.clear();
     game.display();
 
-    let answer = rlSync.question(`Player ${this.playerNumber}: (h)it, (s)tay, or (d)ouble down?\n`).toLowerCase();
-    while (!Player.VALID_MOVES.includes(answer)) {
-      answer = rlSync.question("Invalid answer: (h)it, (s)tay, or (d)ouble down?").toLowerCase();
-    }
-    
-    let turnOngoing = true;
-    while (turnOngoing) {
+    while (true) {
+      let answer = rlSync.question(`Player ${this.playerNumber}: (h)it, (s)tay, or (d)ouble down?\n`).toLowerCase();
+      while (!Player.VALID_MOVES.includes(answer)) {
+        answer = rlSync.question("Invalid answer: (h)it, (s)tay, or (d)ouble down?").toLowerCase();
+      }
+
       if (answer === "hit" || answer === "h") {
-        console.log(this.hand);
         this.getCard(game);
-        console.log(this.hand);
-        this.cont()
-        break;
         if (this.isBusted()) {
-          turnOngoing = false;
-          console.log(`That's ${this.getScore()}. You busted!\n`);
           console.log(`Your cards are: ${this.hand.map(card => card.getPlainEnglish()).join(", ")}`);
+          console.log(`That's ${this.getScore()}. You busted!\n`);
           this.cont();
+          break;
         } 
-        console.log(`Your cards are: ${this.hand.map(card => card.getPlainEnglish()).join(", ")}`);
-        this.cont();
+
+        let successfulHitMessage = `Your cards are: ${this.hand.map(card => card.getPlainEnglish()).join(", ")}`;
+        console.log(successfulHitMessage);
+        console.log("-".repeat(successfulHitMessage.length));
       }
 
       if (answer === "stay" || answer === "s") {
-        turnOngoing = false;
         console.log(`You've stayed. Your cards are: ${this.hand.map(card => card.getPlainEnglish()).join(", ")}`);
+        this.hasStayed = true;
         this.cont();
+        break;
       }
     }
 
@@ -202,6 +204,21 @@ class Dealer extends Participant {
   reveal() {
     //STUB
     // maybe this should go in the game engine?
+  }
+
+  handleTurn() {
+    while (this.getScore() < BJGame.DEALER_HIT_LIMIT) {
+      this.getCard(game);
+      console.log("Dealer Hits!");
+      console.log(`Dealers Hand: ${this.hand.forEach(card => console.log(card.getPlainEnglish()))}`);
+      rlSync.question("Press Enter to continue");
+    }
+    console.log("Dealer Stays");
+    rlSync.question("Press Enter to continue");
+  }
+
+  getCard(game) {
+    game.dealer.deal(this);
   }
 
   deal(participant) {
@@ -237,18 +254,18 @@ class BJGame {
       this.players.forEach(player => {
         player.handleTurn();
       })
-      break;
+      this.display(true, false, true);
       this.dealerTurn();
-    
-      this.payout();
-      if (!this.playAgain) break;
+      this.displayPayout();
+      if (!this.playAgain()) break;
     }
 
     this.displayGoodbyeMessage();
   }
 
   playAgain() {
-    //STUB
+    let answer = rlSync.question("play again? (y/n)").toLowerCase();
+    return answer === "y" ? true : false;
   }
 
   dealARound() {
@@ -260,7 +277,7 @@ class BJGame {
     let answer = rlSync.question("How many folks are playing? (Max 8)\n");
     let numAnswer = parseInt(answer, 10);
     while (!Number.isInteger(numAnswer) || !BJGame.VALID_PLAYER_NUMBERS.includes(numAnswer)) {
-      answer = rlSync.question("Invalid choice. Choose a number from 1-8.\n");
+      numAnswer = parseInt(rlSync.question("Invalid choice. Choose a number from 1-8.\n"), 10);
     }
     return numAnswer;
   }
@@ -271,6 +288,8 @@ class BJGame {
       let player = new Player(idx);
       this.players.push(player);
     }
+
+    // STUB: let players name themselves
   }
 
   collectBets() {
@@ -281,19 +300,18 @@ class BJGame {
 
     for (let player of this.players) {
       let answer = parseInt(rlSync.question(`Player ${player.playerNumber}, place your wager: `), 10);
-      if (!Number.isInteger(answer) || answer > BJGame.MAX_BET || answer < BJGame.MIN_BET) {
+
+      while (!Number.isInteger(answer) || answer > BJGame.MAX_BET || answer < BJGame.MIN_BET || answer > player.money) {
         answer = parseInt(rlSync.question(`Enter a whole number between the min wager (${BJGame.MIN_BET}) and the max wager (${BJGame.MAX_BET})`), 10)
       }
-      if (answer > player.money) {
-        answer = parseInt(rlSync.question(`You don't have enough bread. Enter a bet less than ${player.money + 1}: `), 10)
-      }
+      
       player.wager = answer;
     }
     console.log("");
     rlSync.question("Bets are in! Press enter to start the round!")
   }
 
-  displayDealer(hiddenBoolean) {
+  displayDealerASCII(hiddenBoolean) {
     let asciiCardArr = this.dealer.hand.map(card => card.getASCII());
     
     let dealerRows = {
@@ -339,29 +357,66 @@ class BJGame {
 
   }
 
-  display(hidden = true, playerTurn = undefined) {
-    // Display dealer's cards in ASCII FORM
-    // diplay player cards in a row with PlayerX indicated
-    this.displayDealer(hidden);
-
+  displayPlayerScores() {
     this.players.forEach(player => {
-      let playerCards = `Player ${player.playerNumber}'s cards: ${player.hand[0].getPlainEnglish()}, ${player.hand[1].getPlainEnglish()}`;
-      console.log("-".repeat(playerCards.length));
-      console.log(playerCards);
+      let bustedMessage = `Player ${player.playerNumber}: Busted`;
+      let nonBustedMessage = `Player ${player.playerNumber}: ${player.getScore()} (${player.hand.map(card => card.getPlainEnglish()).join(", ")})`;
+      player.isBusted() ? console.log(bustedMessage) : console.log(nonBustedMessage);
+    })
+  }
+
+  displayPlayerTurns() {
+    this.players.forEach(player => {
+      //let playerCards = `Player ${player.playerNumber}'s cards: ${player.hand[0].getPlainEnglish()}, ${player.hand[1].getPlainEnglish()}`;
+      let playerCards = [];
+      player.hand.forEach(card => {
+        playerCards.push(card.getPlainEnglish())
+      })
+      let playerCardsMessage = `Player ${player.playerNumber}'s cards: ${playerCards.join(", ")}`;
+      console.log("-".repeat(playerCardsMessage.length));
+      console.log(playerCardsMessage);
 
       let chipMessage = `Player ${player.playerNumber}'s wager: ${player.wager} chips`
       player.wager === 1 ? console.log(chipMessage.slice(0, chipMessage.length - 1)) : console.log(chipMessage);
-      console.log("");
+
+      if (player.isBusted()) {
+        console.log("BUSTED");
+      } else if (player.hasStayed) {
+        console.log("STAYED");
+      } else {
+        console.log("")
+      }
     });
   }
-  
 
-  playerTurns() {
-    //STUB
+  display(dealerHidden = true, playerTurns = true, playerScores = false) {
+    // Display dealer's cards in ASCII FORM
+    // diplay player cards in a row with PlayerX indicated
+    this.displayDealerASCII(dealerHidden);
+
+    if (playerTurns) {
+      this.displayPlayerTurns();
+    } 
+    
+    if (playerScores) {
+      this.displayPlayerScores();
+    }
+
+    console.log("");
+    console.log("♥ ♦ ♣ ♠ ".repeat(6));
   }
 
   dealerTurn() {
-    //STUB
+    let continueMessage = "Players' hands finished. Press enter for Dealer Turn";
+    console.log("-".repeat(continueMessage.length));
+    rlSync.question(continueMessage);
+
+    let [dealerHidden, playerTurns, playerScores] = [false, false, true]
+    console.clear();
+    this.display(dealerHidden, playerTurns, playerScores);
+    rlSync.question("Dealer's cards revealed! Press Enter for dealer to play")
+    
+    this.dealer.handleTurn();
   }
 
   displayWelcomeMessage() {
@@ -385,7 +440,61 @@ class BJGame {
   }
 
   payout() {
-    //STUB
+    // all busted players minus their wager
+    let bustedPlayers = this.players.filter(player => player.isBusted());
+    let nonBustedPlayers = this.players.filter(player => !player.isBusted());
+
+    bustedPlayers.forEach(player => {
+      player.money -= player.wager;
+    })
+    // if dealer is busted, 
+      // all players not busted get paid
+    if (this.dealer.isBusted()) {
+      nonBustedPlayers.forEach(player => {
+        player.money += player.wager;
+      })
+    } else {
+      let dealerScore = this.dealer.getScore();
+      nonBustedPlayers.forEach(player => {
+        let playerScore = player.getScore();
+        if (playerScore > dealerScore) {
+          player.money += player.wager;
+        } else if (playerScore < dealerScore) {
+          player.money -= player.wager;
+        } else {
+         // push, nothing happens  
+        }
+      })
+    }
+    // if dealer is not busted
+      // loop over all not busted players
+      // if player score is greater than dealer score
+        // player += wager
+      // if player score is less than dealer score
+        // player -= wager
+      // if player score is equal
+        // push: purse is unchanged
+    
+
+  }
+
+  displayPayout() {
+    this.display(false, false, true);
+    rlSync.question("Calculating payout... press enter to continue");
+    this.payout();
+    this.players.forEach(player => {
+      if (player.isBusted()) {
+        console.log(`Player ${player.playerNumber} busted! ${player.wager} chips deducted from purse.`);
+      } else if (player.getScore() > this.dealer.getScore()) {
+        console.log(`Player ${player.playerNumber} beat the dealer! ${player.wager} chips added to purse.`);
+      } else if (player.getScore() > this.dealer.getScore()) {
+        console.log(`Player ${player.playerNumber} lost to the dealer! ${player.wager} chips deducted from purse.`);
+      } else {
+        console.log(`Player ${player.playerNumber} tied the dealer. Bet was returned.`);
+      }
+    })
+    console.log("♥ ♦ ♣ ♠ ".repeat(6));
+    rlSync.question("Press Enter to Continue");
   }
 }
 
