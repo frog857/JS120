@@ -1,3 +1,9 @@
+// better invalid prompt for betting more than u have - especially in second round
+// Formatting for Dealer hitting
+// dealer doesn't get new cards. Deck doesn't get shuffled either?
+// players also not getting new cards
+// fix ASCII display for 3+ cards
+
 let rlSync = require("readline-sync");
 let shuffleTool = require("shuffle-array");
 
@@ -100,6 +106,10 @@ class Participant {
     //STUB
   }
 
+  getCard(game) {
+    game.dealer.deal(this);
+  }
+
   isBusted() {
     return this.getScore() > BJGame.BLACKJACK ? true : false;
   }
@@ -134,23 +144,17 @@ class Player extends Participant {
     this.playerNumber = playerNumber;
     this.money = Player.DEFAULT_MONEY_AMOUNT;
     this.wager = undefined;
-    this.hasStayed = false;
-  }
-
-  getCard(game) {
-    game.dealer.deal(this);
+    this.hasStayed;
   }
 
   handleTurn() {
-    //function cont() {rlSync.question("Press enter to continue")} // should this go here?
-
     console.clear();
     game.display();
 
     while (true) {
-      let answer = rlSync.question(`Player ${this.playerNumber}: (h)it, (s)tay, or (d)ouble down?\n`).toLowerCase();
+      let answer = rlSync.question(`Player ${this.playerNumber}: (h)it or (s)tay?\n`).toLowerCase();
       while (!Player.VALID_MOVES.includes(answer)) {
-        answer = rlSync.question("Invalid answer: (h)it, (s)tay, or (d)ouble down?").toLowerCase();
+        answer = rlSync.question("Invalid answer: (h)it or (s)tay?").toLowerCase();
       }
 
       if (answer === "hit" || answer === "h") {
@@ -178,11 +182,11 @@ class Player extends Participant {
   }
 
   cont() {
-    rlSync.question("Press enter to continue")
+    rlSync.question("Press enter to continue") // does this really go here?
   }
 
   doubleDown() {
-
+    // STUB can add later. gotta move on to this exam lolol
   }
 }
 
@@ -190,46 +194,36 @@ class Dealer extends Participant {
 
   constructor() {
     super();
-    //STUB
-    // What sort of state does a dealer need?
-    // Score? Hand? Deck of cards? Bow tie?
     this.deck = new Deck();
-  }
-
-
-  hide() {
-    //STUB
-  }
-
-  reveal() {
-    //STUB
-    // maybe this should go in the game engine?
   }
 
   handleTurn() {
     while (this.getScore() < BJGame.DEALER_HIT_LIMIT) {
       this.getCard(game);
+      console.clear();
+      game.display(false, false, true);
       console.log("Dealer Hits!");
-      console.log(`Dealers Hand: ${this.hand.forEach(card => console.log(card.getPlainEnglish()))}`);
-      rlSync.question("Press Enter to continue");
+      console.log(`Dealers Total: ${this.getScore()}`);
+      this.getScore() > BJGame.BLACKJACK ? 
+        rlSync.question(`Dealer Busted! Press Enter to Continue`) : 
+        rlSync.question(`Press Enter to continue`);
     }
-    console.log("Dealer Stays");
-    rlSync.question("Press Enter to continue");
-  }
 
-  getCard(game) {
-    game.dealer.deal(this);
+    if (!this.isBusted()) {
+      console.clear();
+      game.display(false, false, true);
+      console.log(`Dealer Stays. Score: ${this.getScore()}`);
+      rlSync.question("(Press Enter to continue)");
+    }
   }
 
   deal(participant) {
     participant.hand.push(this.deck.cards.pop());
-    // does the dealer or the deck deal? => dealer. Because in larger games may need multiple decks
   }
 }
 
 class BJGame {
   static MIN_BET = 1;
-  static MAX_BET = 10;
   static BLACKJACK = 21;
   static DEALER_HIT_LIMIT = 17;
   static VALID_PLAYER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -237,7 +231,7 @@ class BJGame {
 
   constructor() {
     this.players = [];
-    this.dealer = new Dealer();
+    this.dealer = undefined;
 
   }
 
@@ -245,9 +239,15 @@ class BJGame {
     //SPIKE
     this.displayWelcomeMessage();
     this.handlePlayersInitialization();
+    let firstTime = true;
 
     while (true) {
-      this.collectBets();
+      this.dealer = new Dealer();
+      this.players.forEach(player => {
+        player.hand = [];
+        player.hasStayed = false;
+      })
+      this.collectBets(firstTime);
       this.dealARound();
       this.dealARound();
       this.display();
@@ -257,6 +257,7 @@ class BJGame {
       this.display(true, false, true);
       this.dealerTurn();
       this.displayPayout();
+      firstTime = false;
       if (!this.playAgain()) break;
     }
 
@@ -264,8 +265,12 @@ class BJGame {
   }
 
   playAgain() {
-    let answer = rlSync.question("play again? (y/n)").toLowerCase();
-    return answer === "y" ? true : false;
+    console.log("");
+    let answer = rlSync.question("Another round? (y/n): ").toLowerCase();
+    while (answer[0] !== "y" && answer[0] !== "n") {
+      answer = rlSync.question("Invalid answer. Enter y or n: ").toLowerCase();
+    }
+    return answer[0] === "y" ? true : false;
   }
 
   dealARound() {
@@ -292,21 +297,39 @@ class BJGame {
     // STUB: let players name themselves
   }
 
-  collectBets() {
+  collectBets(firstTime) {
+
     console.clear();
     this.displayWelcomeMessage();
-    console.log(`Welcome. You each have ${Player.DEFAULT_MONEY_AMOUNT} chips to start. `)
-    console.log("");
+    
+    if (firstTime) {
+      let singlePlayerMessage = `Welcome. You have ${Player.DEFAULT_MONEY_AMOUNT} chips to start.`;
+      let multiplayerMessage = `Welcome, all. You each have ${Player.DEFAULT_MONEY_AMOUNT} chips to start.`;
+      this.players.length === 1 ? console.log(singlePlayerMessage) : console.log(multiplayerMessage);
+      console.log("");
+    } else {
+      
+      let playerArrCopy = [...this.players];
+      playerArrCopy.forEach(player => {
+        if (player.money === 0) {
+          console.log(`Player ${player.playerNumber} went bust! Please enjoy watching your friends, Player ${player.playerNumber}`);
+          this.players.splice(player.playerNumber - 1, 1);
+        } else {
+          console.log(`Player ${player.playerNumber} chips: ${player.money}`);
+        }
+      })
+      console.log("");
+    }
 
     for (let player of this.players) {
       let answer = parseInt(rlSync.question(`Player ${player.playerNumber}, place your wager: `), 10);
 
-      while (!Number.isInteger(answer) || answer > BJGame.MAX_BET || answer < BJGame.MIN_BET || answer > player.money) {
-        answer = parseInt(rlSync.question(`Enter a whole number between the min wager (${BJGame.MIN_BET}) and the max wager (${BJGame.MAX_BET})`), 10)
+      while (!Number.isInteger(answer) || answer < BJGame.MIN_BET || answer > player.money) {
+        answer = parseInt(rlSync.question(`Enter a whole number between ${BJGame.MIN_BET} and ${player.money}: `), 10)
       }
-      
       player.wager = answer;
     }
+
     console.log("");
     rlSync.question("Bets are in! Press enter to start the round!")
   }
@@ -348,7 +371,7 @@ class BJGame {
 
     console.clear();
     console.log("+" + "-".repeat(dealerRows.row1.length - 2) + "+");
-    console.log("|   Dealer Showing:     |");
+    console.log(`|   Dealer Showing:${" ".repeat(dealerRows.row1.length - 20)}|`);
     for (let row in dealerRows) {
       console.log(dealerRows[row]);
     }
@@ -367,7 +390,6 @@ class BJGame {
 
   displayPlayerTurns() {
     this.players.forEach(player => {
-      //let playerCards = `Player ${player.playerNumber}'s cards: ${player.hand[0].getPlainEnglish()}, ${player.hand[1].getPlainEnglish()}`;
       let playerCards = [];
       player.hand.forEach(card => {
         playerCards.push(card.getPlainEnglish())
@@ -380,9 +402,9 @@ class BJGame {
       player.wager === 1 ? console.log(chipMessage.slice(0, chipMessage.length - 1)) : console.log(chipMessage);
 
       if (player.isBusted()) {
-        console.log("BUSTED");
+        console.log(`BUSTED: ${player.getScore()}`);
       } else if (player.hasStayed) {
-        console.log("STAYED");
+        console.log(`STAYED: ${player.getScore()}`);
       } else {
         console.log("")
       }
@@ -390,8 +412,6 @@ class BJGame {
   }
 
   display(dealerHidden = true, playerTurns = true, playerScores = false) {
-    // Display dealer's cards in ASCII FORM
-    // diplay player cards in a row with PlayerX indicated
     this.displayDealerASCII(dealerHidden);
 
     if (playerTurns) {
@@ -411,10 +431,13 @@ class BJGame {
     console.log("-".repeat(continueMessage.length));
     rlSync.question(continueMessage);
 
-    let [dealerHidden, playerTurns, playerScores] = [false, false, true]
+    let [dealerHidden, playerTurns, playerScores] = [false, false, true];
+    let revealMessage = "Dealer's cards revealed! Press Enter for dealer to play";
+    
     console.clear();
-    this.display(dealerHidden, playerTurns, playerScores);
-    rlSync.question("Dealer's cards revealed! Press Enter for dealer to play")
+    this.display(dealerHidden, playerTurns, playerScores); // is this the way to do this? or just put fft as args...
+    console.log("-".repeat(revealMessage.length));
+    rlSync.question(revealMessage)
     
     this.dealer.handleTurn();
   }
@@ -432,23 +455,31 @@ class BJGame {
   }
 
   displayGoodbyeMessage() {
-    //STUB
-  }
-
-  displayResult() {
-    //STUB
+    console.clear();  
+    console.log(".__________________________________.");
+    console.log("|♠ ♣ ♥ ♦  ♠ ♣ ♥ ♦  ♠ ♣ ♥ ♦  ♠ ♣ ♥ ♦|");
+    console.log("|----------------------------------|");
+    console.log("|  Thanks for Playing Blackjack!   |");
+    console.log("|----------------------------------|");
+    console.log("|♠ ♣ ♥ ♦  ♠ ♣ ♥ ♦  ♠ ♣ ♥ ♦  ♠ ♣ ♥ ♦|");
+    console.log("|__________________________________|");
+    console.log("");
+    console.log("Final Results:");
+    console.log("");
+    this.players.forEach(player => {
+      console.log(`Player ${player.playerNumber}'s ending purse: ${player.money}`);
+    })
+    console.log("");
   }
 
   payout() {
-    // all busted players minus their wager
     let bustedPlayers = this.players.filter(player => player.isBusted());
     let nonBustedPlayers = this.players.filter(player => !player.isBusted());
 
     bustedPlayers.forEach(player => {
       player.money -= player.wager;
     })
-    // if dealer is busted, 
-      // all players not busted get paid
+
     if (this.dealer.isBusted()) {
       nonBustedPlayers.forEach(player => {
         player.money += player.wager;
@@ -461,39 +492,29 @@ class BJGame {
           player.money += player.wager;
         } else if (playerScore < dealerScore) {
           player.money -= player.wager;
-        } else {
-         // push, nothing happens  
         }
       })
     }
-    // if dealer is not busted
-      // loop over all not busted players
-      // if player score is greater than dealer score
-        // player += wager
-      // if player score is less than dealer score
-        // player -= wager
-      // if player score is equal
-        // push: purse is unchanged
-    
-
   }
 
   displayPayout() {
     this.display(false, false, true);
-    rlSync.question("Calculating payout... press enter to continue");
+    rlSync.question("Calculating payout... (enter to continue)");
     this.payout();
+
     this.players.forEach(player => {
       if (player.isBusted()) {
         console.log(`Player ${player.playerNumber} busted! ${player.wager} chips deducted from purse.`);
-      } else if (player.getScore() > this.dealer.getScore()) {
+      } else if (player.getScore() > this.dealer.getScore() || this.dealer.isBusted()) {
         console.log(`Player ${player.playerNumber} beat the dealer! ${player.wager} chips added to purse.`);
-      } else if (player.getScore() > this.dealer.getScore()) {
+      } else if (player.getScore() < this.dealer.getScore()) {
         console.log(`Player ${player.playerNumber} lost to the dealer! ${player.wager} chips deducted from purse.`);
       } else {
         console.log(`Player ${player.playerNumber} tied the dealer. Bet was returned.`);
       }
     })
     console.log("♥ ♦ ♣ ♠ ".repeat(6));
+    console.log("");
     rlSync.question("Press Enter to Continue");
   }
 }
@@ -504,7 +525,7 @@ game.start();
 
 
 
-/*
+/* Add later
       // if dd
         // get card from dealer
         // check if busted
