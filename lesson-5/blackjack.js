@@ -1,9 +1,17 @@
 /*
 Lint issue categories I don't know solution for:
 
-- using rlSync.question to control user flow
+- using rlSync.question to control user flow is not allowed...
 - using static properties and instances of orchestration engine class (constructor function) outside of said class
--
+- main game flow too many lines & statements
+- some line lengths are violated, but seems more readable to me
+*/
+
+/*
+Bonus features to add later:
+- let players name themselves
+- "double down" option
+- "split" option
 */
 
 let rlSync = require("readline-sync");
