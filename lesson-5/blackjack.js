@@ -144,7 +144,6 @@ class Participant {
   }
 }
 
-
 class Player extends Participant {
   static DEFAULT_MONEY_AMOUNT = 10;
   static VALID_MOVES = ["s", "stay", "h", "hit", "d", "double down", "double", "dd"];
@@ -162,6 +161,7 @@ class Player extends Participant {
     game.display();
 
     while (true) {
+      if (this.isBusted()) break;
       let answer = rlSync.question(`Player ${this.playerNumber}: (h)it or (s)tay?\n`).toLowerCase();
       while (!Player.VALID_MOVES.includes(answer)) {
         answer = rlSync.question("Invalid answer: (h)it or (s)tay?").toLowerCase();
