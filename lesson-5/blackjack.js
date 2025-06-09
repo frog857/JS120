@@ -151,6 +151,7 @@ class Player extends Participant {
   constructor(playerNumber) {
     super();
     this.playerNumber = playerNumber;
+    this.playerName = undefined;
     this.money = Player.DEFAULT_MONEY_AMOUNT;
     this.wager = undefined;
     this.hasStayed = undefined;
@@ -300,6 +301,7 @@ class BJGame {
     BJGame.NUM_OF_PLAYERS = this.getNumberOfPlayers();
     for (let idx = 1; idx <= BJGame.NUM_OF_PLAYERS; idx++) {
       let player = new Player(idx);
+      player.playerName = rlSync.question(`Player ${player.playerNumber}, what's your name?\n`);
       this.players.push(player);
     }
 
@@ -318,7 +320,7 @@ class BJGame {
     }
 
     for (let player of this.players) {
-      let answer = parseInt(rlSync.question(`Player ${player.playerNumber}, place your wager: `), 10);
+      let answer = parseInt(rlSync.question(`${player.playerName}, place your wager: `), 10);
 
       while (!Number.isInteger(answer) || answer < BJGame.MIN_BET || answer > player.money) {
         answer = parseInt(rlSync.question(`Enter a whole number between ${BJGame.MIN_BET} and ${player.money}: `), 10);
@@ -342,10 +344,10 @@ class BJGame {
     let playerArrCopy = [...this.players];
     playerArrCopy.forEach(player => {
       if (player.money === 0) {
-        console.log(`Player ${player.playerNumber} went bust! Please enjoy watching your friends, Player ${player.playerNumber}`);
+        console.log(`${player.playerName} went bust! Please enjoy watching your friends, ${player.playerName}`);
         this.players.splice(player.playerNumber - 1, 1);
       } else {
-        console.log(`Player ${player.playerNumber} chips: ${player.money}`);
+        console.log(`${player.playerName} chips: ${player.money}`);
       }
     });
     console.log("");
@@ -399,8 +401,8 @@ class BJGame {
 
   displayPlayerScores() {
     this.players.forEach(player => {
-      let bustedMessage = `Player ${player.playerNumber}: Busted`;
-      let nonBustedMessage = `Player ${player.playerNumber}: ${player.getScore()} (${player.hand.map(card => card.getPlainEnglish()).join(", ")})`;
+      let bustedMessage = `${player.playerName}: Busted`;
+      let nonBustedMessage = `${player.playerName}: ${player.getScore()} (${player.hand.map(card => card.getPlainEnglish()).join(", ")})`;
 
       player.isBusted() ? console.log(bustedMessage) : console.log(nonBustedMessage);
     });
@@ -413,11 +415,11 @@ class BJGame {
         playerCards.push(card.getPlainEnglish());
       });
 
-      let playerCardsMessage = `Player ${player.playerNumber}'s cards: ${playerCards.join(", ")}`;
+      let playerCardsMessage = `${player.playerName}'s cards: ${playerCards.join(", ")}`;
       console.log("-".repeat(playerCardsMessage.length));
       console.log(playerCardsMessage);
 
-      let chipMessage = `Player ${player.playerNumber}'s wager: ${player.wager} chips`;
+      let chipMessage = `${player.playerName}'s wager: ${player.wager} chips`;
       player.wager === 1 ? // I don't get this linter error... "Expected an assignment or function call and instead saw an expression"
         console.log(chipMessage.slice(0, chipMessage.length - 1)) :
         console.log(chipMessage);
@@ -488,7 +490,7 @@ class BJGame {
     console.log("Final Results:");
     console.log("");
     this.players.forEach(player => {
-      console.log(`Player ${player.playerNumber}'s ending purse: ${player.money}`);
+      console.log(`${player.playerName}'s ending purse: ${player.money}`);
     });
     console.log("");
   }
@@ -523,13 +525,13 @@ class BJGame {
 
     this.players.forEach(player => {
       if (player.isBusted()) {
-        console.log(`Player ${player.playerNumber} busted! ${player.wager} chips deducted from purse.`);
+        console.log(`${player.playerName} busted! ${player.wager} chips deducted from purse.`);
       } else if (player.getScore() > this.dealer.getScore() || this.dealer.isBusted()) {
-        console.log(`Player ${player.playerNumber} beat the dealer! ${player.wager} chips added to purse.`);
+        console.log(`${player.playerName} beat the dealer! ${player.wager} chips added to purse.`);
       } else if (player.getScore() < this.dealer.getScore()) {
-        console.log(`Player ${player.playerNumber} lost to the dealer! ${player.wager} chips deducted from purse.`);
+        console.log(`${player.playerName} lost to the dealer! ${player.wager} chips deducted from purse.`);
       } else {
-        console.log(`Player ${player.playerNumber} tied the dealer. Bet was returned.`);
+        console.log(`${player.playerName} tied the dealer. Bet was returned.`);
       }
     });
     console.log("♥ ♦ ♣ ♠ ".repeat(6));
