@@ -1,0 +1,1 @@
+// Explain prototypal inheritance in javascript. 
